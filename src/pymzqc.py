@@ -2,10 +2,25 @@ import json
 import os
 
 import jsonschema
+from jsonschema.exceptions import ValidationError
 
 
 MZQC_VERSION = '0.0.11'
 QCCV_VERSION = '0.1.0'
+
+
+def _find(key, val):
+    if hasattr(val, 'items'):
+        for k, v in val.items():
+            if k == key:
+                yield v
+            elif isinstance(v, dict):
+                for result in _find(key, v):
+                    yield result
+            elif isinstance(v, list):
+                for d in v:
+                    for result in _find(key, d):
+                        yield result
 
 
 def validate(filename: str):
@@ -20,3 +35,13 @@ def validate(filename: str):
         schema = json.load(schema_in)
         jsonschema.validate(
             instance, schema, format_checker=jsonschema.draft7_format_checker)
+
+        # Semantic validation of the JSON file.
+        # Verify that cvRefs are valid.
+        cv_refs = instance['mzQC']['cv'].keys()
+        for cv_ref in _find('cvRef', instance['mzQC']):
+            if cv_ref not in cv_refs:
+                raise ValidationError(f'Unknown CV reference <{cv_ref}>')
+
+        # Semantic validation against the QC CV.
+        # TODO

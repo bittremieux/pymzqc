@@ -1,26 +1,25 @@
 import json
 import os
+from typing import Dict, List, Union
 
 import jsonschema
+import pronto
 from jsonschema.exceptions import ValidationError
 
 
 MZQC_VERSION = '0.0.11'
-QCCV_VERSION = '0.1.0'
 
 
-def _find(key, val):
+def _get_cv_parameters(val: Union[Dict, List, float, int, str]):
     if hasattr(val, 'items'):
+        if 'cvRef' in val:
+            yield val
         for k, v in val.items():
-            if k == key:
-                yield v
-            elif isinstance(v, dict):
-                for result in _find(key, v):
-                    yield result
+            if isinstance(v, dict):
+                yield from _get_cv_parameters(v)
             elif isinstance(v, list):
                 for d in v:
-                    for result in _find(key, d):
-                        yield result
+                    yield from _get_cv_parameters(d)
 
 
 def validate(filename: str):
@@ -39,9 +38,10 @@ def validate(filename: str):
         # Semantic validation of the JSON file.
         # Verify that cvRefs are valid.
         cv_refs = instance['mzQC']['cv'].keys()
-        for cv_ref in _find('cvRef', instance['mzQC']):
-            if cv_ref not in cv_refs:
-                raise ValidationError(f'Unknown CV reference <{cv_ref}>')
+        for cv_parameter in _get_cv_parameters(instance['mzQC']):
+            if cv_parameter['cvRef'] not in cv_refs:
+                raise ValidationError(f'Unknown CV reference '
+                                      f'<{cv_parameter["cvRef"]}>')
         quality_lists = []
         if 'runQuality' in instance['mzQC']:
             quality_lists.extend(instance['mzQC']['runQuality'])
@@ -73,4 +73,17 @@ def validate(filename: str):
                                           f'accession = {accession}')
 
         # Semantic validation against the QC CV.
-        # TODO
+        # Verify that all references to terms in the CVs are correct.
+        cvs = {cv_ref: pronto.Ontology(cv['uri'], False)
+               for cv_ref, cv in instance['mzQC']['cv'].items()}
+        for cv_parameter in _get_cv_parameters(instance):
+            # Verify that the term exists in the CV.
+            cv_term = cvs[cv_parameter['cvRef']].get(cv_parameter['accession'])
+            if cv_term is None:
+                raise ValidationError(f'Term {cv_parameter["accession"]} not '
+                                      f'found in CV <{cv_parameter["cvRef"]}>')
+            # Verify that the term name is correct.
+            elif cv_parameter['name'] != cv_term.name:
+                raise ValidationError(
+                    f'Incorrect name for CV term {cv_parameter["accession"]}: '
+                    f'"{cv_parameter["name"]}" != "{cv_term.name}"')

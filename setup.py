@@ -32,5 +32,6 @@ setuptools.setup(
     packages=['pymzqc'],
     install_requires=[
         'jsonschema',
+        'pronto',
         'rfc3987'],
 )

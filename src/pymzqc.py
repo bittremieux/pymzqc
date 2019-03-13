@@ -29,9 +29,8 @@ def validate(filename: str):
             f'master/schema/v{version}/mzqc_{version}.schema.json'
         with urllib.request.urlopen(schema_url, timeout=2) as schema_in:
             schema = json.loads(schema_in.read().decode())
-            jsonschema.validate(
-                instance, schema,
-                format_checker=jsonschema.draft7_format_checker)
+            jsonschema.validate(instance, schema,
+                                format_checker=jsonschema.FormatChecker())
 
         # Semantic validation of the JSON file.
         # Verify that cvRefs are valid.

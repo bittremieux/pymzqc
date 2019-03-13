@@ -30,7 +30,7 @@ def validate(filename: str):
         os.path.dirname(os.path.realpath(__file__)), '..', 'data',
         f'mzqc_{MZQC_VERSION.replace(".", "_")}.schema.json')
     with open(filename) as json_in, open(filename_schema) as schema_in:
-        # Validate the mzQC file against the JSON schema.
+        # Syntactic validation of the mzQC file against the JSON schema.
         instance = json.load(json_in)
         schema = json.load(schema_in)
         jsonschema.validate(
@@ -42,6 +42,21 @@ def validate(filename: str):
         for cv_ref in _find('cvRef', instance['mzQC']):
             if cv_ref not in cv_refs:
                 raise ValidationError(f'Unknown CV reference <{cv_ref}>')
+        # Verify that qualityParameters are unique within a run/setQuality.
+        param_lists = []
+        if 'runQuality' in instance['mzQC']:
+            param_lists.extend(instance['mzQC']['runQuality'])
+        if 'setQuality' in instance['mzQC']:
+            param_lists.extend(instance['mzQC']['setQuality'])
+        for param_list in param_lists:
+            accessions = set()
+            for quality_parameter in param_list['qualityParameters']:
+                accession = quality_parameter['accession']
+                if accession not in accessions:
+                    accessions.add(accession)
+                else:
+                    raise ValidationError(f'Duplicate qualityParameter: '
+                                          f'accession = {accession}')
 
         # Semantic validation against the QC CV.
         # TODO

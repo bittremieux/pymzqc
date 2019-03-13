@@ -42,15 +42,29 @@ def validate(filename: str):
         for cv_ref in _find('cvRef', instance['mzQC']):
             if cv_ref not in cv_refs:
                 raise ValidationError(f'Unknown CV reference <{cv_ref}>')
-        # Verify that qualityParameters are unique within a run/setQuality.
-        param_lists = []
+        quality_lists = []
         if 'runQuality' in instance['mzQC']:
-            param_lists.extend(instance['mzQC']['runQuality'])
+            quality_lists.extend(instance['mzQC']['runQuality'])
         if 'setQuality' in instance['mzQC']:
-            param_lists.extend(instance['mzQC']['setQuality'])
-        for param_list in param_lists:
+            quality_lists.extend(instance['mzQC']['setQuality'])
+        # Verify that input files are consistent and unique.
+        for quality_list in quality_lists:
+            files = set()
+            for input_file in quality_list['metadata']['inputFiles']:
+                if input_file['name'] != os.path.splitext(
+                        os.path.basename(input_file['location']))[0]:
+                    raise ValidationError(f'Inconsistent file name and '
+                                          f'location: {input_file["name"]} - '
+                                          f'{input_file["location"]}')
+                if input_file['name'] not in files:
+                    files.add(input_file['name'])
+                else:
+                    raise ValidationError(f'Duplicate inputFile: '
+                                          f'name = {input_file["name"]}')
+        # Verify that qualityParameters are unique within a run/setQuality.
+        for quality_list in quality_lists:
             accessions = set()
-            for quality_parameter in param_list['qualityParameters']:
+            for quality_parameter in quality_list['qualityParameters']:
                 accession = quality_parameter['accession']
                 if accession not in accessions:
                     accessions.add(accession)

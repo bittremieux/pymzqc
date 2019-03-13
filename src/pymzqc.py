@@ -8,9 +8,6 @@ import pronto
 from jsonschema.exceptions import ValidationError
 
 
-MZQC_VERSION = '0.0.11'
-
-
 def _get_cv_parameters(val: Union[Dict, List, float, int, str]):
     if hasattr(val, 'items'):
         if 'cvRef' in val:

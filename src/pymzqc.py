@@ -1,5 +1,6 @@
 import json
 import os
+import urllib.request
 from typing import Dict, List, Union
 
 import jsonschema
@@ -23,17 +24,17 @@ def _get_cv_parameters(val: Union[Dict, List, float, int, str]):
 
 
 def validate(filename: str):
-    # TODO: Do we want to be able to validate against
-    #       older versions of the schema?
-    filename_schema = os.path.join(
-        os.path.dirname(os.path.realpath(__file__)), '..', 'data',
-        f'mzqc_{MZQC_VERSION.replace(".", "_")}.schema.json')
-    with open(filename) as json_in, open(filename_schema) as schema_in:
+    with open(filename) as json_in:
         # Syntactic validation of the mzQC file against the JSON schema.
         instance = json.load(json_in)
-        schema = json.load(schema_in)
-        jsonschema.validate(
-            instance, schema, format_checker=jsonschema.draft7_format_checker)
+        version = instance['mzQC']['version'].replace('.', '_')
+        schema_url = f'https://raw.githubusercontent.com/HUPO-PSI/mzQC/' \
+            f'master/schema/v{version}/mzqc_{version}.schema.json'
+        with urllib.request.urlopen(schema_url, timeout=2) as schema_in:
+            schema = json.loads(schema_in.read().decode())
+            jsonschema.validate(
+                instance, schema,
+                format_checker=jsonschema.draft7_format_checker)
 
         # Semantic validation of the JSON file.
         # Verify that cvRefs are valid.
